@@ -1,6 +1,7 @@
 library(tidyverse)
 library(AMR)
 library(xgboost)
+library(animation)
 
 prev_courses <- sample(c(0, 1, 2, 3, 4),
                        size = 1e4,
@@ -53,9 +54,9 @@ model <- xgb.train(data = dtrain, nrounds = 100,
                                     eval = dtest),
                    params = list(objective = "binary:logistic"))
 
-preds <- predict(model, dtest)
+pred <- predict(model, dtest)
 
-plot(test_y ~ preds)
+plot(test_y ~ pred)
 
 # continuous
 x <- rnorm(1e4) 
@@ -79,11 +80,33 @@ model <- xgb.train(data = dtrain, nrounds = 100,
           watchlist = list(train = dtrain,
                        eval = dtest))
 
-preds <- predict(model, dtest)
+models <- lapply(1:10, \(x) {
+  xgb.train(data = dtrain, nrounds = x,
+                                 watchlist = list(train = dtrain,
+                                                  eval = dtest)) })
+pred <- predict(model, dtest)
 
-plot(test_y ~ preds)
+plot(test_y ~ pred)
 
-tibble(test_x, preds, test_y) %>% 
-  pivot_longer(cols = all_of(c("preds", "test_y"))) %>% 
+tibble(test_x, pred, test_y) %>% 
+  pivot_longer(cols = all_of(c("pred", "test_y"))) %>% 
   ggplot(aes(x = test_x, y = value, color = name)) +
   geom_point()
+
+
+preds <- lapply(models, \(x) {
+  predict(x, dtest)
+})
+
+saveHTML({
+  for (i in seq_along(preds)) {
+    flush.console()
+    print(
+      tibble(test_x, preds = preds[[i]], test_y) %>% 
+      pivot_longer(cols = all_of(c("preds", "test_y"))) %>% 
+      ggplot(aes(x = test_x, y = value, color = name)) +
+      geom_jitter()
+    )
+    #Sys.sleep(0.5)
+  }
+})
